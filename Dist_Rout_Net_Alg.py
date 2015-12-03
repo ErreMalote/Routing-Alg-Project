@@ -79,10 +79,12 @@ class ResettableTimer():
 
 def estimate_costs():
     """ Recalculate inter-node path costs using bellman ford algorithm """
-    #----------------------------------------------------------------------
-    # -> Check for duplicates, to avaoid the distance update of ourselves |
-    # -> Iterate through neighbors and find available cheapest route      |
-    #----------------------------------------------------------------------
+    # =======================================================================
+    # Objective:                                                           ||
+    #----------------------------------------------------------------------||
+    # -> Check for duplicates, to avaoid the distance update of ourselves  ||
+    # -> Iterate through neighbors and find available cheapest route       ||
+    # =======================================================================
     for destination_addr, destination in nodes.iteritems():
         if destination_addr != me:
             cost = float("inf")
@@ -99,22 +101,26 @@ def estimate_costs():
 
 
 def update_costs(host, port, **kwargs):
-    # ------------------------------------------------------------
-    # Handles existen and non-existen nodes in our list of nodes |
-    # Saving or recording each of their cost...                  |
-    # ------------------------------------------------------------
+    # ================================================================
+    # Objective:                                                    ||
+    # --------------------------------------------------------------||
+    # -> Handles existen and non-existen nodes in our list of nodes ||
+    # -> Saving or recording each of their cost...                  ||
+    # ================================================================
     """ update neighbor's costs """
     costs = kwargs['costs']
     addr = addr2key(host, port)
 
-    # Create a new node
-    # -----------------
+    # ---------------------
+    #  Create a new node  |
+    # ---------------------
     for node in costs:
         if node not in nodes:
             nodes[node] = default_node()
 
-    # If node not a neighbor ...
-    # ----------------------
+    # ----------------------------
+    #  If node not a neighbor ...|
+    # ----------------------------
     if not nodes[addr]['is_neighbor']:
         # ... Make it your neighbor!
         print 'making new neighbor {0}\n'.format(addr)
@@ -134,10 +140,12 @@ def update_costs(host, port, **kwargs):
 
 
 def linkdown(host, port, **kwargs):
-    #---------------------------------
-    # Save direct distance to        |
-    # neighbor, then set to infinity |
-    #---------------------------------
+    #==============================================
+    # Objectives:                                ||
+    # -------------------------------------------||
+    # -> Save direct distance to                 ||
+    # -> neighbor, then set to infinity          ||
+    #==============================================
     node, addr, err = get_node(host, port)
     if err: return
     if not node['is_neighbor']:
@@ -157,14 +165,15 @@ def broadcast_costs():
     for neighbor_addr, neighbor in get_neighbors().iteritems():
         poisoned_costs = deepcopy(costs)
         for dest_addr, cost in costs.iteritems():    	        # only do poisoned reverse...
-														        # if destination not me or neighbor
+							        # if destination not me or neighbor
 
             if dest_addr not in [me, neighbor_addr]:            # If we route through neighbor to get to destination ...
                 if nodes[dest_addr]['route'] == neighbor_addr:  # ... tell neighbor distance to destination is infinty!
                     poisoned_costs[dest_addr] = float("inf")
 
-        # Send (potentially 'poisoned') costs to neighbor
-        # -----------------------------------------------
+        # -------------------------------------------------
+        # Send (potentially 'poisoned') costs to neighbor |
+        # -------------------------------------------------
         data['payload'] = { 'costs': poisoned_costs }
         data['payload']['neighbor'] = { 'direct': neighbor['direct'] }
         sock.sendto(json.dumps(data), key2addr(neighbor_addr))
@@ -186,7 +195,24 @@ def default_node():
 
 
 def create_node(cost, is_neighbor, direct=None, costs=None, addr=None):
-    """ centralizes the pattern for creating new nodes """
+    #=========================================================
+    #    Takes:      (float)                                ||
+    #               (boolen)                                ||
+    #               (boolen)                                ||
+    #           (dictionary)                                ||
+    #   Return: node's address and status                   ||
+    #-------------------------------------------------------||
+    # Purposed: Ensure transmition cost of neighbored nodes ||
+    #           and updates using a resettable timer        ||
+    #=========================================================
+   nodes[addr] = create_node(
+                cost        = nodes[addr]['cost'],
+                is_neighbor = True,
+                direct      = kwargs['neighbor']['direct'],
+                costs       = costs,
+                addr        = addr)
+
+    """ Centralizes the pattern for creating new nodes """
     node = default_node()
     node['cost'] = cost
     node['is_neighbor'] = is_neighbor
@@ -195,7 +221,6 @@ def create_node(cost, is_neighbor, direct=None, costs=None, addr=None):
 
     if is_neighbor:
         node['route'] = addr
-        # Ensure neighbor is transmitting cost updates using a resettable timer
         monitor = ResettableTimer(
             interval = 3*run_args.timeout,
             func = linkdown,
@@ -206,17 +231,37 @@ def create_node(cost, is_neighbor, direct=None, costs=None, addr=None):
 
 
 def get_node(host, port):
+    #====================================================
+    #    Takes: host's address,                        ||
+    #           host's port,                           ||
+    #   Return: node's address and status              ||
+    #--------------------------------------------------||
+    # Purposed: Check for neighbored nodes...          ||
+    #====================================================
     """ returns formatted address and node info for that addr """
     error = False
-    addr = addr2key(get_host(host), port)
-    if not in_network(addr): error = 'node not in network'
+    addr  = addr2key(get_host(host), port)
+
+    if not in_network(addr): 
+        error = 'node not in network'
+
     node = nodes[addr]
     return node, addr, error
 
 
 def linkchange(host, port, **kwargs):
+    #====================================================
+    #    Takes: host's address,                        ||
+    #           host's port,                           ||
+    #           **                                     ||
+    #   Return: (void)                                 ||
+    #--------------------------------------------------||
+    # Purposed: Check status of neighbored nodes...    ||
+    #           Then change their links if need to...  ||
+    #====================================================
     node, addr, err = get_node(host, port)
     if err: return
+
     if not node['is_neighbor']:
         print "node {0} is not a neighbor so the link cost can't be changed\n".format(addr)
         return
@@ -227,24 +272,35 @@ def linkchange(host, port, **kwargs):
         return
 
     if 'saved' in node:
-        print "this link currently down. please first bring link back to life using LINKUP cmd."
+        print "This link's currently down. Please first bring link back to life using LINKUP cmd."
         return
     node['direct'] = direct
     estimate_costs()        # run bellman-ford
 
 
 def linkup(host, port, **kwargs):
+    #====================================================
+    #    Takes: host's address,                        ||
+    #           host's port,                           ||
+    #           **                                     ||
+    #   Return: (void)                                 ||
+    #--------------------------------------------------||
+    # Purposed: -> Check for "LINKDOWN cmd" nodes      ||
+    #           -> Restore required distances          ||
+    #====================================================
     node, addr, err = get_node(host, port)
     if err: return
 
-    # make sure node was previously taken down via LINKDOWN cmd
-    # ---------------------------------------------------------
+    # -----------------------------------------------------------
+    # make sure node was previously taken down via LINKDOWN cmd |
+    # -----------------------------------------------------------
     if 'saved' not in node:
         print "{0} wasn't a previous neighbor\n".format(addr)
         return
 
-    # restore saved direct distance
-    # -----------------------------
+    # -------------------------------
+    # restore saved direct distance |
+    # -------------------------------
     node['direct'] = node['saved']
     del node['saved']
     node['is_neighbor'] = True
@@ -256,7 +312,7 @@ def formatted_now():
 
 
 def show_neighbors():
-    """ show active neighbors """
+    """ Show active neighbors """
     print formatted_now()
     print "Neighbors: "
     for addr, neighbor in get_neighbors().iteritems():
@@ -268,7 +324,7 @@ def show_neighbors():
 
 
 def showrt():
-    """ display routing info: cost to destination; route to take """
+    """ Display routing info: cost to destination; route to take """
     print formatted_now()
     print "Distance vector list is:"
     for addr, node in nodes.iteritems():
@@ -329,30 +385,37 @@ def is_int(i):
         return False
 
 def parse_argv():
+    #====================================================
+    #    Takes: (void)                                 ||
+    #   Return: (void)                                 ||
+    #--------------------------------------------------||
+    # Purposed: -> Port Validates 		       ||
+    #           -> Timeout Validates                   ||
+    #====================================================
     """
     pythonicize bflient run args
     (note: yes, I know I should be raising exceptions instead of returning {'err'} dicts)
     """
+    #------------------
+    #   Validations   |
+    #------------------
     s = sys.argv[1:]
     parsed = {}
+    port = s.pop(0)	# Validates port
+    timeout = s.pop(0)  # Validates timeout
 
-    # Validate port
-    #--------------
-    port = s.pop(0)
     if not is_int(port):
         return { 'error': "port values must be integers. {0} is not an int.".format(port) }
     parsed['port'] = int(port)
 
-    # Validate timeout
-    #-----------------
-    timeout = s.pop(0)
     if not is_number(timeout):
         return { 'error': "timeout must be a number. {0} is not a number.".format(timeout) }
     parsed['timeout'] = float(timeout)
 
-    # Iterate through s extracting and validating
-    # neighbors and costs along the way
-    # --------------------------------------------
+    # ---------------------------------------------
+    # Iterate through s extracting and validating |
+    # neighbors and costs along the way           |
+    # ---------------------------------------------
     parsed['neighbors'] = []
     parsed['costs'] = []
 
@@ -384,26 +447,30 @@ def parse_user_input(user_input):
     (note: yes, I know I should be raising exceptions instead of returning {'err'} dicts)
     """
 
-    # Define default return value
-    #----------------------------
+    #--------------------------------
+    #  Define default return value  |
+    #--------------------------------
     parsed = { 'addr': (), 'payload': {} }
     user_input = user_input.split()
     if not len(user_input):
         return { 'error': "please provide a command\n" }
 
-    # Verify cmd is valid
-    #--------------------
+    #----------------------------
+    #    Verify cmd is valid    |
+    #----------------------------
     cmd = user_input[0].lower()
     if cmd not in user_cmds:
         return { 'error': "'{0}' is not a valid command\n".format(cmd) }
 
-    # CMDs below require args
-    #------------------------
+    #----------------------------
+    #  CMDs below require args  |
+    #----------------------------
     if cmd in [LINKDOWN, LINKUP, LINKCHANGE]:
         args = user_input[1:]
 
-        # Validate args
-        #--------------
+    	#--------------------
+        #    Validate args  |
+        #--------------------
         if cmd in [LINKDOWN, LINKUP] and len(args) != 2:
             return { 'error': "'{0}' cmd requires args: host, port\n".format(cmd) }
 
@@ -440,9 +507,9 @@ def print_nodes():
 
 #==============================================================|| Main Program ||
 
-#---------------------------------------#
-# map command/update names to functions #
-#---------------------------------------#
+#=========================================
+# Map Command/Update Names to Functions ||
+#=========================================
 user_cmds = {
     LINKDOWN   : linkdown,
     LINKUP     : linkup,
@@ -469,8 +536,9 @@ if __name__ == '__main__':
     RunArgs = namedtuple('RunInfo', 'port timeout neighbors costs')
     run_args = RunArgs(**parsed)
 
-    # initialize dict of nodes to all neighbors
-    # -----------------------------------------
+    # -------------------------------------------
+    # initialize dict of nodes to all neighbors |
+    # -------------------------------------------
     nodes = defaultdict(lambda: default_node())
     for neighbor, cost in zip(run_args.neighbors, run_args.costs):
         nodes[neighbor] = create_node(cost=cost,
@@ -479,20 +547,22 @@ if __name__ == '__main__':
                                       addr=neighbor)
 
     sock = setup_server(localhost, run_args.port)	# begin accepting UDP packets
-    me = addr2key(*sock.getsockname())				# set cost to myself to 0
+    me = addr2key(*sock.getsockname())			# set cost to myself to 0
     nodes[me] = create_node(cost=0.0,
                             direct=0.0,
                             is_neighbor=False,
                             addr=me)
 
-    # broadcast costs every timeout seconds
-    # -------------------------------------
+    # ---------------------------------------
+    # broadcast costs every timeout seconds |
+    # ---------------------------------------
     broadcast_costs()
     RepeatTimer(run_args.timeout, broadcast_costs).start()
 
 
-    # listen for updates from other nodes and user input
-    # --------------------------------------------------
+    # ----------------------------------------------------
+    # listen for updates from other nodes and user input |
+    # ----------------------------------------------------
     inputs = [sock, sys.stdin]
     running = True
 
@@ -502,22 +572,31 @@ if __name__ == '__main__':
         for s in in_ready:
             if s == sys.stdin:
 
-                # User input command
+    		# --------------------
+                # User input command |
+    		# --------------------
                 parsed = parse_user_input(sys.stdin.readline())
                 if 'error' in parsed:
                     print parsed['error']
                     continue
 
+    		# ----------------------------------------------
+                # Notify node on one end of the link of action |
+    		# ----------------------------------------------
                 cmd = parsed['cmd']
                 if cmd in [LINKDOWN, LINKUP, LINKCHANGE]:
-                    # Notify node on other end of the link of action
                     data = json.dumps({ 'type': cmd, 'payload': parsed['payload'] })
                     sock.sendto(data, parsed['addr'])
-                # Perform cmd on this side of the link
+
+    		# -------------------------------------------------
+                # Else: cmd is performed on other end of the link |
+    		# -------------------------------------------------
                 user_cmds[cmd](*parsed['addr'], **parsed['payload'])
 
             else:
-                # update from another node
+    		#--------------------------------------
+                # Updates performed from another node |
+    		#--------------------------------------
                 data, sender = s.recvfrom(SIZE)
                 loaded = json.loads(data)
                 update = loaded['type']
