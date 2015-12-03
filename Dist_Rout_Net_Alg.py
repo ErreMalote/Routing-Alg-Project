@@ -1,25 +1,25 @@
-# Reminder: NEEDS MODIFICATIONS...?
+# Reminder: NEEDS MODIFICATIONS...!!!
 
 #--------------------------------------------------------------
 # Team NO:     403                                            |
 #--------------------------------------------------------------
-# Members:     Francisco        [1000]                        |
-#              Brandon:         [1000]                        |
-#              Miguel Obiang    [1000819926]                  |
-#              Reynaldo:        [1000]                        |
-#              Tomi:            [1000]                        |
+# Members:     Francisco Martínez   [1000784747]              |
+#              Brandon Lawrence     [1000______]              |
+#              Miguel Obiang        [1000819926]              |
+#              Reynaldo Gonzales    [1000991514]              |
+#              Adetomilola Popoola  [1000855160]              |
 #                                                             |
 # Course:      CSE4344-001 [Networks]                         |
 # Assignment:  Final Project [Routing Algorithm]              |
 # Date:        December 24, 2015                              |
 #--------------------------------------------------------------
+
 import sys, socket, json, time
 from select import select
 from collections import defaultdict, namedtuple
 from threading import Thread, Timer
 from datetime import datetime
 from copy import deepcopy
-
 
 #-----------------------------------------------------------------
 # User commands and inter-node protocol update types             |
@@ -34,6 +34,7 @@ CLOSE         = "close"
 COSTSUPDATE   = "costsupdate"
 SHOWNEIGHBORS = "neighbors"
 SIZE          = 4096
+
 
 
 #==============================================================|| Functions ||
