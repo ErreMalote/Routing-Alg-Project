@@ -4,7 +4,7 @@
 # Team NO:     403                                            |
 #--------------------------------------------------------------
 # Members:     Francisco Martínez   [1000784747]              |
-#              Brandon Lawrence     [1000      ]              |
+#              Brandon Lawrence     [1000744004]              |
 #              Miguel Obiang        [1000819926]              |
 #              Reynaldo Gonzales    [1000991514]              |
 #              Adetomilola Popoola  [1000855160]              |
@@ -111,16 +111,16 @@ def update_costs(host, port, **kwargs):
     # -----------------
     for node in costs:
         if node not in nodes:
-            nodes[node] = default_node()	
+            nodes[node] = default_node()
 
     # If node not a neighbor ...
     # ----------------------
-    if not nodes[addr]['is_neighbor']: 
+    if not nodes[addr]['is_neighbor']:
         # ... Make it your neighbor!
         print 'making new neighbor {0}\n'.format(addr)
         del nodes[addr]
         nodes[addr] = create_node(
-                cost        = nodes[addr]['cost'], 
+                cost        = nodes[addr]['cost'],
                 is_neighbor = True,
                 direct      = kwargs['neighbor']['direct'],
                 costs       = costs,
@@ -140,7 +140,7 @@ def linkdown(host, port, **kwargs):
     #---------------------------------
     node, addr, err = get_node(host, port)
     if err: return
-    if not node['is_neighbor']: 
+    if not node['is_neighbor']:
         print "node {0} is not a neighbor so it can't be taken down\n".format(addr)
         return
     node['saved'] = node['direct']
@@ -197,7 +197,7 @@ def create_node(cost, is_neighbor, direct=None, costs=None, addr=None):
         node['route'] = addr
         # Ensure neighbor is transmitting cost updates using a resettable timer
         monitor = ResettableTimer(
-            interval = 3*run_args.timeout, 
+            interval = 3*run_args.timeout,
             func = linkdown,
             args = list(key2addr(addr)))
         monitor.start()
@@ -217,7 +217,7 @@ def get_node(host, port):
 def linkchange(host, port, **kwargs):
     node, addr, err = get_node(host, port)
     if err: return
-    if not node['is_neighbor']: 
+    if not node['is_neighbor']:
         print "node {0} is not a neighbor so the link cost can't be changed\n".format(addr)
         return
 
@@ -261,7 +261,7 @@ def show_neighbors():
     print "Neighbors: "
     for addr, neighbor in get_neighbors().iteritems():
         print "{addr}, cost:{cost}, direct:{direct}".format(
-                addr   = addr, 
+                addr   = addr,
                 cost   = neighbor['cost'],
                 direct = neighbor['direct'])
     print # extra line
@@ -467,7 +467,7 @@ if __name__ == '__main__':
         sys.exit(1)
 
     RunArgs = namedtuple('RunInfo', 'port timeout neighbors costs')
-    run_args = RunArgs(**parsed) 
+    run_args = RunArgs(**parsed)
 
     # initialize dict of nodes to all neighbors
     # -----------------------------------------
@@ -481,13 +481,13 @@ if __name__ == '__main__':
     sock = setup_server(localhost, run_args.port)	# begin accepting UDP packets
     me = addr2key(*sock.getsockname())				# set cost to myself to 0
     nodes[me] = create_node(cost=0.0,
-                            direct=0.0, 
-                            is_neighbor=False, 
+                            direct=0.0,
+                            is_neighbor=False,
                             addr=me)
 
     # broadcast costs every timeout seconds
     # -------------------------------------
-    broadcast_costs()								
+    broadcast_costs()
     RepeatTimer(run_args.timeout, broadcast_costs).start()
 
 
@@ -497,7 +497,7 @@ if __name__ == '__main__':
     running = True
 
     while running:
-        in_ready, out_ready, except_ready = select(inputs,[],[]) 
+        in_ready, out_ready, except_ready = select(inputs,[],[])
 
         for s in in_ready:
             if s == sys.stdin:
@@ -516,7 +516,7 @@ if __name__ == '__main__':
                 # Perform cmd on this side of the link
                 user_cmds[cmd](*parsed['addr'], **parsed['payload'])
 
-            else: 
+            else:
                 # update from another node
                 data, sender = s.recvfrom(SIZE)
                 loaded = json.loads(data)
@@ -529,4 +529,3 @@ if __name__ == '__main__':
                 updates[update](*sender, **payload)
 
     sock.close()
-
