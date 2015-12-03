@@ -1,11 +1,13 @@
+# Reminder: NEEDS MODIFICATIONS...?
+
 #--------------------------------------------------------------
 # Team NO:     403                                            |
 #--------------------------------------------------------------
-# Members:     Miguel Obiang    [1000819926]                  |
-#              Francisco:       [1000]                        |
+# Members:     Francisco        [1000]                        |
+#              Brandon:         [1000]                        |
+#              Miguel Obiang    [1000819926]                  |
 #              Reynaldo:        [1000]                        |
-#              T:               [1000]                        |
-#              N:               [1000]                        |
+#              Tomi:            [1000]                        |
 #                                                             |
 # Course:      CSE4344-001 [Networks]                         |
 # Assignment:  Final Project [Routing Algorithm]              |
