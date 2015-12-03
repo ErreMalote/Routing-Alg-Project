@@ -4,7 +4,7 @@
 # Team NO:     403                                            |
 #--------------------------------------------------------------
 # Members:     Francisco Martínez   [1000784747]              |
-#              Brandon Lawrence     [1000______]              |
+#              Brandon Lawrence     [1000      ]              |
 #              Miguel Obiang        [1000819926]              |
 #              Reynaldo Gonzales    [1000991514]              |
 #              Adetomilola Popoola  [1000855160]              |
