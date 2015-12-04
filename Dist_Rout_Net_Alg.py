@@ -507,7 +507,7 @@ def aux_user_cmdPrompt(argList):
 
         while not is_int(cmdArg):
             sys.stdout.write("port values must be integers. {0} is not an int.")
-            parsed = sys.stdin.readline()
+            cmdArg = sys.stdin.readline()
 
         argList.append(str(cmdArg))
         sys.stdout.write("Enter the timeout for this machine: ")
