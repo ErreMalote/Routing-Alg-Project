@@ -14,7 +14,10 @@
 # Date:        December 24, 2015                              |
 #--------------------------------------------------------------
 
-import sys, socket, json, time
+# Netifaces module must be installed
+# Not a default library
+# TODO Find alternative module
+import sys, socket, json, time, netifaces
 from select import select
 from collections import defaultdict, namedtuple
 from threading import Thread, Timer
@@ -294,7 +297,7 @@ def linkup(host, port, **kwargs):
     node['direct'] = node['saved']
     del node['saved']
     node['is_neighbor'] = True
-    estimate_costs()		
+    estimate_costs()
 
 
 def show_neighbors():
@@ -394,7 +397,8 @@ def parse_argv():
     s = sys.argv[1:]
     parsed = {}
 
-    if not s: aux_user_cmdPrompt(s) 
+    if not s: aux_user_cmdPrompt(s)
+
     port = s.pop(0)	# Validates port
     timeout = s.pop(0)  # Validates timeout
 
@@ -441,14 +445,14 @@ def parse_user_input(user_input):
     parsed = { 'addr': (), 'payload': {} }
     user_input = user_input.split()
     if not len(user_input):
-        return { 'Error': "please provide a command\n" }
+        return { 'error': "please provide a command\n" }
 
     #----------------------------
     #    Verify cmd is valid    |
     #----------------------------
     cmd = user_input[0].lower()
     if cmd not in user_cmds:
-        return { 'Error': "'{0}' is not a valid command\n".format(cmd) }
+        return { 'error': "'{0}' is not a valid command\n".format(cmd) }
 
     #----------------------------
     #  CMDs below require args  |
@@ -460,21 +464,21 @@ def parse_user_input(user_input):
         #    Validate args  |
         #--------------------
         if cmd in [LINKDOWN, LINKUP] and len(args) != 2:
-            return { 'Error': "'{0}' cmd requires args: host, port\n".format(cmd) }
+            return { 'error': "'{0}' cmd requires args: host, port\n".format(cmd) }
 
         elif cmd == LINKCHANGE and len(args) != 3:
-            return { 'Error': "'{0}' cmd requires args: host, port, link cost\n".format(cmd) }
+            return { 'error': "'{0}' cmd requires args: host, port, link cost\n".format(cmd) }
 
         port = args[1]
         if not is_int(port):
-            return { 'Error': "port must be an integer value\n" }
+            return { 'error': "port must be an integer value\n" }
 
         parsed['addr'] = (get_host(args[0]), int(port))
         if cmd == LINKCHANGE:
             cost = args[2]
 
             if not is_number(cost):
-                return { 'Error': "new link weight must be a number\n" }
+                return { 'error': "new link weight must be a number\n" }
             parsed['payload'] = { 'direct': float(cost) }
 
     parsed['cmd'] = cmd
@@ -482,16 +486,44 @@ def parse_user_input(user_input):
 
 
 def print_nodes():
-    """ helper function for debugging """
-    print "nodes: "
-    for addr, node in nodes.iteritems():
-        print addr
-        for k,v in node.iteritems():
-            print '---- ', k, '\t\t', v
+    interfaces = netifaces.interfaces()
+    for i in interfaces:
+        # if i == 'lo':
+        #     continue
+        iface = netifaces.ifaddresses(i).get(netifaces.AF_INET)
+        if iface != None:
+            for j in iface:
+                print i, " \t| ", j['addr']
+    # """ helper function for debugging """
+    # print "nodes: "
+    # for addr, node in nodes.iteritems():
+    #     print addr
+    #     for k,v in node.iteritems():
+    #         print '---- ', k, '\t\t', v
     print # extra line
+
+#=========================================
+# Map Command/Update Names to Functions ||
+#=========================================
+user_cmds = {
+    LINKDOWN   : linkdown,
+    LINKUP     : linkup,
+    LINKCHANGE : linkchange,
+    SHOWRT     : showrt,
+    CLOSE      : close,
+    SHOWNEIGHBORS : show_neighbors,
+    DEBUG      : print_nodes,
+}
+updates = {
+    LINKDOWN   : linkdown,
+    LINKUP     : linkup,
+    LINKCHANGE : linkchange,
+    COSTSUPDATE: update_costs,
+}
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ [ NEW FUNCTION BEGINS HERE ]]
+
 
 def aux_user_cmdPrompt(argList):
         #====================================================
@@ -506,7 +538,7 @@ def aux_user_cmdPrompt(argList):
         cmdArg = sys.stdin.readline()
 
         while not is_int(cmdArg):
-            sys.stdout.write("port values must be integers. {0} is not an int.")
+            sys.stdout.write("port values must be integers. {0} is not an int: ")
             cmdArg = sys.stdin.readline()
 
         argList.append(str(cmdArg))
@@ -514,7 +546,7 @@ def aux_user_cmdPrompt(argList):
         cmdArg = sys.stdin.readline()
 
         while not is_int(cmdArg):
-            sys.stdout.write("timeout values must be integers. {0} is not an int.")
+            sys.stdout.write("timeout values must be integers. {0} is not an int: ")
             cmdArg = sys.stdin.readline()
 
         argList.append(str(cmdArg))
@@ -570,26 +602,6 @@ def _listenUpdateHandler(inputs):
 
 
 #======================================================================|| Main Program ||
-
-#=========================================
-# Map Command/Update Names to Functions ||
-#=========================================
-user_cmds = {
-    LINKDOWN   : linkdown,
-    LINKUP     : linkup,
-    LINKCHANGE : linkchange,
-    SHOWRT     : showrt,
-    CLOSE      : close,
-    SHOWNEIGHBORS : show_neighbors,
-    DEBUG      : print_nodes,
-}
-updates = {
-    LINKDOWN   : linkdown,
-    LINKUP     : linkup,
-    LINKCHANGE : linkchange,
-    COSTSUPDATE: update_costs,
-}
-
 if __name__ == '__main__':
     localhost = socket.gethostbyname(socket.gethostname())
     parsed = parse_argv()
