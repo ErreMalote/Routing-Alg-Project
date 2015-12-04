@@ -38,7 +38,7 @@ SIZE          = 4096
 
 
 
-#==============================================================|| Functions ||
+#======================================================================|| Required Functions ||
 class RepeatTimer(Thread):
     """ Thread that will call a function every interval seconds """
     def __init__(self, interval, target):
@@ -167,7 +167,6 @@ def broadcast_costs():
         poisoned_costs = deepcopy(costs)
         for dest_addr, cost in costs.iteritems():    	        # only do poisoned reverse...
 							        # if destination not me or neighbor
-
             if dest_addr not in [me, neighbor_addr]:            # If we route through neighbor to get to destination ...
                 if nodes[dest_addr]['route'] == neighbor_addr:  # ... tell neighbor distance to destination is infinty!
                     poisoned_costs[dest_addr] = float("inf")
@@ -191,9 +190,6 @@ def setup_server(host, port):
         sys.exit(1)
     return sock
 
-def default_node():
-    return { 'cost': float("inf"), 'is_neighbor': False, 'route': '' }
-
 
 def create_node(cost, is_neighbor, direct=None, costs=None, addr=None):
     #=========================================================
@@ -206,13 +202,6 @@ def create_node(cost, is_neighbor, direct=None, costs=None, addr=None):
     # Purposed: Ensure transmition cost of neighbored nodes ||
     #           and updates using a resettable timer        ||
     #=========================================================
-    # nodes[addr] = create_node(
-    # cost        = nodes[addr]['cost'],
-    # is_neighbor = True,
-    # direct      = kwargs['neighbor']['direct'],
-    # costs       = costs,
-    # addr        = addr)
-
     """ Centralizes the pattern for creating new nodes """
     node = default_node()
     node['cost'] = cost
@@ -305,11 +294,7 @@ def linkup(host, port, **kwargs):
     node['direct'] = node['saved']
     del node['saved']
     node['is_neighbor'] = True
-    estimate_costs()		# run bellman-ford
-
-
-def formatted_now():
-    return datetime.now().strftime("%b-%d-%Y, %I:%M %p, %S seconds")
+    estimate_costs()		
 
 
 def show_neighbors():
@@ -349,6 +334,11 @@ def close():
     '''
     sys.exit()
 
+def formatted_now():
+    return datetime.now().strftime("%b-%d-%Y, %I:%M %p, %S seconds")
+
+def default_node():
+    return { 'cost': float("inf"), 'is_neighbor': False, 'route': '' }
 
 def in_network(addr):
     if addr not in nodes:
@@ -385,12 +375,13 @@ def is_int(i):
     except ValueError:
         return False
 
+
 def parse_argv():
     #====================================================
     #    Takes: (void)                                 ||
     #   Return: (void)                                 ||
     #--------------------------------------------------||
-    # Purposed: -> Port Validates 		               ||
+    # Purposed: -> Port Validates 		       ||
     #           -> Timeout Validates                   ||
     #====================================================
     """
@@ -403,35 +394,14 @@ def parse_argv():
     s = sys.argv[1:]
     parsed = {}
 
-#TODO MOVE TO SEPARATE FUNCTION??
-# NEW Functions
-    if not s:
-        print "Enter the port for this machine to listen on:"
-        arg = sys.stdin.readline()
-        while not is_int(arg):
-            print "port values must be integers. {0} is not an int."
-            parsed = sys.stdin.readline()
-        s.append(str(arg))
-        print "Enter the timeout for this machine:"
-        arg = sys.stdin.readline()
-        while not is_int(arg):
-            print "timeout values must be integers. {0} is not an int."
-            arg = sys.stdin.readline()
-        s.append(str(arg))
-
-        # return { 'error': "please provide host, port, and link cost for each link." }
-#END NEW FUNCTIONS
-
-
+    if not s: aux_user_cmdPrompt(s) 
     port = s.pop(0)	# Validates port
     timeout = s.pop(0)  # Validates timeout
 
-    if not is_int(port):
-        return { 'error': "port values must be integers. {0} is not an int.".format(port) }
+    if not is_int(port): return { 'error': "port values must be integers. {0} is not an int.".format(port) }
     parsed['port'] = int(port)
 
-    if not is_number(timeout):
-        return { 'error': "timeout must be a number. {0} is not a number.".format(timeout) }
+    if not is_number(timeout): return { 'error': "timeout must be a number. {0} is not a number.".format(timeout) }
     parsed['timeout'] = float(timeout)
 
     # ---------------------------------------------
@@ -442,35 +412,28 @@ def parse_argv():
     parsed['costs'] = []
 
     while len(s):
-        if len(s) < 3:
-            return { 'error': "please provide host, port, and link cost for each link." }
-
+        if len(s) < 3: return { 'error': "please provide host, port, and link cost for each link." }
         host = get_host(s[0].lower())
         port = s[1]
 
-        if not is_int(port):
-            return { 'error': "port values must be integers. {0} is not an int.".format(port) }
-
+        if not is_int(port): return { 'error': "port values must be integers. {0} is not an int.".format(port) }
         parsed['neighbors'].append(addr2key(host, port))
         cost = s[2]
 
-        if not is_number(cost):
-            return { 'error': "link costs must be numbers. {0} is not a number.".format(cost) }
-
+        if not is_number(cost): return { 'error': "link costs must be numbers. {0} is not a number.".format(cost) }
         parsed['costs'].append(float(s[2]))
         del s[0:3]
 
     return parsed
 
-# def prompt_user_args(user_input):
-
-
 
 def parse_user_input(user_input):
+    #====================================================================================
     """
     validate user input and parse values into dict. returns (error, parsed) tuple.
     (note: yes, I know I should be raising exceptions instead of returning {'err'} dicts)
     """
+    #====================================================================================
 
     #--------------------------------
     #  Define default return value  |
@@ -478,14 +441,14 @@ def parse_user_input(user_input):
     parsed = { 'addr': (), 'payload': {} }
     user_input = user_input.split()
     if not len(user_input):
-        return { 'error': "please provide a command\n" }
+        return { 'Error': "please provide a command\n" }
 
     #----------------------------
     #    Verify cmd is valid    |
     #----------------------------
     cmd = user_input[0].lower()
     if cmd not in user_cmds:
-        return { 'error': "'{0}' is not a valid command\n".format(cmd) }
+        return { 'Error': "'{0}' is not a valid command\n".format(cmd) }
 
     #----------------------------
     #  CMDs below require args  |
@@ -497,21 +460,21 @@ def parse_user_input(user_input):
         #    Validate args  |
         #--------------------
         if cmd in [LINKDOWN, LINKUP] and len(args) != 2:
-            return { 'error': "'{0}' cmd requires args: host, port\n".format(cmd) }
+            return { 'Error': "'{0}' cmd requires args: host, port\n".format(cmd) }
 
         elif cmd == LINKCHANGE and len(args) != 3:
-            return { 'error': "'{0}' cmd requires args: host, port, link cost\n".format(cmd) }
+            return { 'Error': "'{0}' cmd requires args: host, port, link cost\n".format(cmd) }
 
         port = args[1]
         if not is_int(port):
-            return { 'error': "port must be an integer value\n" }
+            return { 'Error': "port must be an integer value\n" }
 
         parsed['addr'] = (get_host(args[0]), int(port))
         if cmd == LINKCHANGE:
             cost = args[2]
 
             if not is_number(cost):
-                return { 'error': "new link weight must be a number\n" }
+                return { 'Error': "new link weight must be a number\n" }
             parsed['payload'] = { 'direct': float(cost) }
 
     parsed['cmd'] = cmd
@@ -528,9 +491,85 @@ def print_nodes():
     print # extra line
 
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ [ NEW FUNCTION BEGINS HERE ]]
+
+def aux_user_cmdPrompt(argList):
+        #====================================================
+        #    Takes: (List)                                 ||
+        #   Return: (void)                                 ||
+        #--------------------------------------------------||
+        # Purposed: Provide an alternative method to input ||
+        #           data to the user...                    ||
+        #====================================================
+
+        sys.stdout.write("Enter the port for this machine to listen on: ")
+        cmdArg = sys.stdin.readline()
+
+        while not is_int(cmdArg):
+            sys.stdout.write("port values must be integers. {0} is not an int.")
+            parsed = sys.stdin.readline()
+
+        argList.append(str(cmdArg))
+        sys.stdout.write("Enter the timeout for this machine: ")
+        cmdArg = sys.stdin.readline()
+
+        while not is_int(cmdArg):
+            sys.stdout.write("timeout values must be integers. {0} is not an int.")
+            cmdArg = sys.stdin.readline()
+
+        argList.append(str(cmdArg))
 
 
-#==============================================================|| Main Program ||
+def _listenUpdateHandler(inputs):
+    running = True
+    while running:
+        in_ready, out_ready, except_ready = select(inputs,[],[])
+
+        for s in in_ready:
+
+            if s == sys.stdin:
+    		# --------------------
+                # User input command |
+    		# --------------------
+                parsed = parse_user_input(sys.stdin.readline())
+                if 'error' in parsed:
+                    print parsed['error']
+                    continue
+
+    		# ----------------------------------------------
+                # Notify node on one end of the link of action |
+    		# ----------------------------------------------
+                cmd = parsed['cmd']
+                if cmd in [LINKDOWN, LINKUP, LINKCHANGE]:
+                    data = json.dumps({ 'type': cmd, 'payload': parsed['payload'] })
+                    sock.sendto(data, parsed['addr'])
+
+    		# -------------------------------------------------
+                # Else: cmd is performed on other end of the link |
+    		# -------------------------------------------------
+                user_cmds[cmd](*parsed['addr'], **parsed['payload'])
+
+            else:
+    		#--------------------------------------
+                # Updates performed from another node |
+    		#--------------------------------------
+                data, sender = s.recvfrom(SIZE)
+                loaded = json.loads(data)
+                update = loaded['type']
+                payload = loaded['payload']
+
+                if update not in updates:
+                    print "'{0}' is not in the update protocol\n".format(update)
+                    continue
+                updates[update](*sender, **payload)
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ [ NEW FUNCTION ENDS HERE ]
+
+
+
+
+
+#======================================================================|| Main Program ||
 
 #=========================================
 # Map Command/Update Names to Functions ||
@@ -589,48 +628,7 @@ if __name__ == '__main__':
     # ----------------------------------------------------
     # listen for updates from other nodes and user input |
     # ----------------------------------------------------
-    inputs = [sock, sys.stdin]
-    running = True
-
-    while running:
-        in_ready, out_ready, except_ready = select(inputs,[],[])
-
-        for s in in_ready:
-            if s == sys.stdin:
-
-    		# --------------------
-                # User input command |
-    		# --------------------
-                parsed = parse_user_input(sys.stdin.readline())
-                if 'error' in parsed:
-                    print parsed['error']
-                    continue
-
-    		# ----------------------------------------------
-                # Notify node on one end of the link of action |
-    		# ----------------------------------------------
-                cmd = parsed['cmd']
-                if cmd in [LINKDOWN, LINKUP, LINKCHANGE]:
-                    data = json.dumps({ 'type': cmd, 'payload': parsed['payload'] })
-                    sock.sendto(data, parsed['addr'])
-
-    		# -------------------------------------------------
-                # Else: cmd is performed on other end of the link |
-    		# -------------------------------------------------
-                user_cmds[cmd](*parsed['addr'], **parsed['payload'])
-
-            else:
-    		#--------------------------------------
-                # Updates performed from another node |
-    		#--------------------------------------
-                data, sender = s.recvfrom(SIZE)
-                loaded = json.loads(data)
-                update = loaded['type']
-                payload = loaded['payload']
-
-                if update not in updates:
-                    print "'{0}' is not in the update protocol\n".format(update)
-                    continue
-                updates[update](*sender, **payload)
+    _inputs = [sock, sys.stdin]
+    _listenUpdateHandler(_inputs)
 
     sock.close()
