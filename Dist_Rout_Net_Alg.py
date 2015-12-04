@@ -3,7 +3,7 @@
 #--------------------------------------------------------------
 # Team NO:     403                                            |
 #--------------------------------------------------------------
-# Members:     Francisco Martínez   [1000784747]              |
+# Members:     Francisco Martinez   [1000784747]              |
 #              Brandon Lawrence     [1000744004]              |
 #              Miguel Obiang        [1000819926]              |
 #              Reynaldo Gonzales    [1000991514]              |
@@ -205,13 +205,6 @@ def create_node(cost, is_neighbor, direct=None, costs=None, addr=None):
     # Purposed: Ensure transmition cost of neighbored nodes ||
     #           and updates using a resettable timer        ||
     #=========================================================
-   nodes[addr] = create_node(
-                cost        = nodes[addr]['cost'],
-                is_neighbor = True,
-                direct      = kwargs['neighbor']['direct'],
-                costs       = costs,
-                addr        = addr)
-
     """ Centralizes the pattern for creating new nodes """
     node = default_node()
     node['cost'] = cost
