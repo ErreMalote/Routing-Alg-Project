@@ -546,8 +546,8 @@ if __name__ == '__main__':
                                       is_neighbor=True,
                                       addr=neighbor)
 
-    sock = setup_server(localhost, run_args.port)	# begin accepting UDP packets
-    me = addr2key(*sock.getsockname())			# set cost to myself to 0
+    sock = setup_server(localhost, run_args.port)  # begin accepting UDP packets
+    me = addr2key(*sock.getsockname())		   # set cost to myself to 0
     nodes[me] = create_node(cost=0.0,
                             direct=0.0,
                             is_neighbor=False,
