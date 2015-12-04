@@ -206,12 +206,12 @@ def create_node(cost, is_neighbor, direct=None, costs=None, addr=None):
     # Purposed: Ensure transmition cost of neighbored nodes ||
     #           and updates using a resettable timer        ||
     #=========================================================
-    nodes[addr] = create_node(
-    cost        = nodes[addr]['cost'],
-    is_neighbor = True,
-    direct      = kwargs['neighbor']['direct'],
-    costs       = costs,
-    addr        = addr)
+    # nodes[addr] = create_node(
+    # cost        = nodes[addr]['cost'],
+    # is_neighbor = True,
+    # direct      = kwargs['neighbor']['direct'],
+    # costs       = costs,
+    # addr        = addr)
 
     """ Centralizes the pattern for creating new nodes """
     node = default_node()
@@ -390,7 +390,7 @@ def parse_argv():
     #    Takes: (void)                                 ||
     #   Return: (void)                                 ||
     #--------------------------------------------------||
-    # Purposed: -> Port Validates 		       ||
+    # Purposed: -> Port Validates 		               ||
     #           -> Timeout Validates                   ||
     #====================================================
     """
@@ -403,9 +403,24 @@ def parse_argv():
     s = sys.argv[1:]
     parsed = {}
 
+#TODO MOVE TO SEPARATE FUNCTION??
+# NEW Functions
     if not s:
-        return { 'error': "please provide host, port, and link cost for each link." }
+        print "Enter the port for this machine to listen on:"
+        arg = sys.stdin.readline()
+        while not is_int(arg):
+            print "port values must be integers. {0} is not an int."
+            parsed = sys.stdin.readline()
+        s.append(str(arg))
+        print "Enter the timeout for this machine:"
+        arg = sys.stdin.readline()
+        while not is_int(arg):
+            print "timeout values must be integers. {0} is not an int."
+            arg = sys.stdin.readline()
+        s.append(str(arg))
 
+        # return { 'error': "please provide host, port, and link cost for each link." }
+#END NEW FUNCTIONS
 
 
     port = s.pop(0)	# Validates port
@@ -446,6 +461,9 @@ def parse_argv():
         del s[0:3]
 
     return parsed
+
+# def prompt_user_args(user_input):
+
 
 
 def parse_user_input(user_input):
