@@ -33,6 +33,7 @@ SHOWRT        = "showrt"
 CLOSE         = "close"
 COSTSUPDATE   = "costsupdate"
 SHOWNEIGHBORS = "neighbors"
+DEBUG         = "debug"
 SIZE          = 4096
 
 
@@ -205,6 +206,13 @@ def create_node(cost, is_neighbor, direct=None, costs=None, addr=None):
     # Purposed: Ensure transmition cost of neighbored nodes ||
     #           and updates using a resettable timer        ||
     #=========================================================
+    nodes[addr] = create_node(
+    cost        = nodes[addr]['cost'],
+    is_neighbor = True,
+    direct      = kwargs['neighbor']['direct'],
+    costs       = costs,
+    addr        = addr)
+
     """ Centralizes the pattern for creating new nodes """
     node = default_node()
     node['cost'] = cost
@@ -235,7 +243,7 @@ def get_node(host, port):
     error = False
     addr  = addr2key(get_host(host), port)
 
-    if not in_network(addr): 
+    if not in_network(addr):
         error = 'node not in network'
 
     node = nodes[addr]
@@ -394,6 +402,12 @@ def parse_argv():
     #------------------
     s = sys.argv[1:]
     parsed = {}
+
+    if not s:
+        return { 'error': "please provide host, port, and link cost for each link." }
+
+
+
     port = s.pop(0)	# Validates port
     timeout = s.pop(0)  # Validates timeout
 
@@ -510,6 +524,7 @@ user_cmds = {
     SHOWRT     : showrt,
     CLOSE      : close,
     SHOWNEIGHBORS : show_neighbors,
+    DEBUG      : print_nodes,
 }
 updates = {
     LINKDOWN   : linkdown,
