@@ -14,10 +14,8 @@
 # Date:        December 24, 2015                              |
 #--------------------------------------------------------------
 
-# Netifaces module must be installed
-# Not a default library
-# TODO Find alternative module
 import sys, socket, json, time, netifaces
+import urllib2
 from select import select
 from collections import defaultdict, namedtuple
 from threading import Thread, Timer
@@ -159,6 +157,7 @@ def linkdown(host, port, **kwargs):
         return
     node['saved'] = node['direct']
     node['direct'] = float("inf")
+    node['counter'] += 1
     node['is_neighbor'] = False
     node['silence_monitor'].cancel()
     estimate_costs()	# Run bellman-ford
@@ -166,15 +165,19 @@ def linkdown(host, port, **kwargs):
 
 def broadcast_costs():
     """ send estimated path costs to each neighbor """
+    for node in nodes.iteritems():
+        if node[1]['counter'] >= 1:
+            node[1]['counter'] += 1
     costs = { addr: node['cost'] for addr, node in nodes.iteritems() }
     data = { 'type': COSTSUPDATE }
     for neighbor_addr, neighbor in get_neighbors().iteritems():
         poisoned_costs = deepcopy(costs)
         for dest_addr, cost in costs.iteritems():    	        # only do poisoned reverse...
-							        # if destination not me or neighbor
+ 			                                        # if destination not me or neighbor
             if dest_addr not in [me, neighbor_addr]:            # If we route through neighbor to get to destination ...
                 if nodes[dest_addr]['route'] == neighbor_addr:  # ... tell neighbor distance to destination is infinty!
                     poisoned_costs[dest_addr] = float("inf")
+
 
         # -------------------------------------------------
         # Send (potentially 'poisoned') costs to neighbor |
@@ -182,6 +185,16 @@ def broadcast_costs():
         data['payload'] = { 'costs': poisoned_costs }
         data['payload']['neighbor'] = { 'direct': neighbor['direct'] }
         sock.sendto(json.dumps(data), key2addr(neighbor_addr))
+
+
+
+def garbage_collect():
+    global nodes
+    nodes_copy = nodes.copy()
+    for node in nodes.iteritems():
+        if node[1]['counter'] > 4:
+            del nodes_copy[node[0]]
+    nodes = nodes_copy.copy()
 
 
 def setup_server(host, port):
@@ -213,6 +226,7 @@ def create_node(cost, is_neighbor, direct=None, costs=None, addr=None):
     node['is_neighbor'] = is_neighbor
     node['direct'] = direct if direct != None else float("inf")
     node['costs']  = costs  if costs  != None else defaultdict(lambda: float("inf"))
+    node['counter'] = 0
 
     if is_neighbor:
         node['route'] = addr
@@ -320,12 +334,14 @@ def showrt():
     print "Distance vector list is:"
     for addr, node in nodes.iteritems():
         if addr != me:
-            print ("Destination = {destination}, "
+            print ("Destination = {destination:>19}, "
                    "Cost = {cost:>4}, "
-                   "Link = ({nexthop})").format(
-                        destination = addr,
-                        cost        = node['cost'],
-                        nexthop     = node['route'])
+                   "NextHop = {nexthop:>19}, "
+                   "Interface = {interface:<7}").format(
+                        	destination = addr,
+                        	cost        = node['cost'],
+                        	nexthop     = node['route'],
+                       		 interface   = get_interface(me.split(':')[0]))
     print # extra line
 
 
@@ -361,6 +377,15 @@ def addr2key(host, port):
 def get_host(host):
     """ translate host into ip address """
     return localhost if host == 'localhost' else host
+
+def get_interface(host):
+    interfaces = netifaces.interfaces()
+    for i in interfaces:
+        iface = netifaces.ifaddresses(i).get(netifaces.AF_INET)
+        if iface != None:
+            for j in iface:
+                if host == j['addr']:
+                    return i
 
 def get_neighbors():
     """ return dict of all neighbors (does not include self) """
@@ -487,25 +512,6 @@ def parse_user_input(user_input):
     return parsed
 
 
-def print_nodes():
-    interfaces = netifaces.interfaces()
-    for i in interfaces:
-        # if i == 'lo':
-        #     continue
-        if len(i) > 8: print i, "\t| ", j['addr']
-        else:
-            iface = netifaces.ifaddresses(i).get(netifaces.AF_INET)
-            if iface != None:
-                for j in iface:
-                    print i, " \t\t| ", j['addr']
-    # """ helper function for debugging """
-    # print "nodes: "
-    # for addr, node in nodes.iteritems():
-    #     print addr
-    #     for k,v in node.iteritems():
-    #         print '---- ', k, '\t\t', v
-    print # extra line
-
 
 #=========================================
 # Map Command/Update Names to Functions ||
@@ -517,7 +523,7 @@ user_cmds = {
     SHOWRT     : showrt,
     CLOSE      : close,
     SHOWNEIGHBORS : show_neighbors,
-    DEBUG      : print_nodes,
+    # DEBUG      : print_nodes,
 }
 updates = {
     LINKDOWN   : linkdown,
@@ -525,8 +531,6 @@ updates = {
     LINKCHANGE : linkchange,
     COSTSUPDATE: update_costs,
 }
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ [ NEW FUNCTION BEGINS HERE ]]
 
 
 def aux_user_cmdPrompt(argList):
@@ -599,14 +603,14 @@ def _listenUpdateHandler(inputs):
                     continue
                 updates[update](*sender, **payload)
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ [ NEW FUNCTION ENDS HERE ]
-
 
 
 
 
 #======================================================================|| Main Program ||
+
 if __name__ == '__main__':
+    #localhost = netifaces.ifaddresses('vnic1')[netifaces.AF_INET][0]['addr']
     localhost = socket.gethostbyname(socket.gethostname())
     parsed = parse_argv()
 
@@ -621,7 +625,6 @@ if __name__ == '__main__':
     # initialize dict of nodes to all neighbors |
     # -------------------------------------------
     nodes = defaultdict(lambda: default_node())
-    counter = defaultdict(lambda: int())
     for neighbor, cost in zip(run_args.neighbors, run_args.costs):
         nodes[neighbor] = create_node(cost=cost,
                                       direct=cost,
@@ -640,6 +643,8 @@ if __name__ == '__main__':
     # ---------------------------------------
     broadcast_costs()
     RepeatTimer(run_args.timeout, broadcast_costs).start()
+    RepeatTimer(run_args.timeout*4, garbage_collect).start()
+
 
 
     # ----------------------------------------------------
