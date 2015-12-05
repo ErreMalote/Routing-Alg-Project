@@ -42,6 +42,7 @@ SIZE          = 4096
 
 
 #======================================================================|| Required Functions ||
+
 class RepeatTimer(Thread):
     """ Thread that will call a function every interval seconds """
     def __init__(self, interval, target):
@@ -92,16 +93,17 @@ def estimate_costs():
     for destination_addr, destination in nodes.iteritems():
         if destination_addr != me:
             cost = float("inf")
-            nexthop = ''
+            nexthop = '999.999.999.999'
             for neighbor_addr, neighbor in get_neighbors().iteritems():
                 if destination_addr in neighbor['costs']:
                     dist = neighbor['direct'] + neighbor['costs'][destination_addr]
-                    if dist < cost:
+                    if dist <= cost:
                         cost = dist
-                        nexthop = neighbor_addr
+                        nexthop = min(nexthop, neighbor_addr)
             # set new estimated cost to node in the network
             destination['cost'] = cost
-            destination['route'] = nexthop
+            if (nexthop == '999.999.999.999'): destination['route'] = ''
+            else:  destination['route'] = nexthop
 
 
 def update_costs(host, port, **kwargs):
@@ -127,7 +129,7 @@ def update_costs(host, port, **kwargs):
     # ----------------------------
     if not nodes[addr]['is_neighbor']:
         # ... Make it your neighbor!
-        print 'making new neighbor {0}\n'.format(addr)
+        print 'Making new neighbor {0}\n'.format(addr)
         del nodes[addr]
         nodes[addr] = create_node(
                 cost        = nodes[addr]['cost'],
@@ -196,9 +198,9 @@ def setup_server(host, port):
 
 def create_node(cost, is_neighbor, direct=None, costs=None, addr=None):
     #=========================================================
-    #    Takes:      (float)                                ||
-    #               (boolen)                                ||
-    #               (boolen)                                ||
+    #    Takes: (float)                                     ||
+    #           (boolen)                                    ||
+    #           (boolen)                                    ||
     #           (dictionary)                                ||
     #   Return: node's address and status                   ||
     #-------------------------------------------------------||
@@ -319,7 +321,7 @@ def showrt():
     for addr, node in nodes.iteritems():
         if addr != me:
             print ("Destination = {destination}, "
-                   "Cost = {cost}, "
+                   "Cost = {cost:>4}, "
                    "Link = ({nexthop})").format(
                         destination = addr,
                         cost        = node['cost'],
@@ -490,10 +492,12 @@ def print_nodes():
     for i in interfaces:
         # if i == 'lo':
         #     continue
-        iface = netifaces.ifaddresses(i).get(netifaces.AF_INET)
-        if iface != None:
-            for j in iface:
-                print i, " \t| ", j['addr']
+        if len(i) > 8: print i, "\t| ", j['addr']
+        else:
+            iface = netifaces.ifaddresses(i).get(netifaces.AF_INET)
+            if iface != None:
+                for j in iface:
+                    print i, " \t\t| ", j['addr']
     # """ helper function for debugging """
     # print "nodes: "
     # for addr, node in nodes.iteritems():
@@ -501,6 +505,7 @@ def print_nodes():
     #     for k,v in node.iteritems():
     #         print '---- ', k, '\t\t', v
     print # extra line
+
 
 #=========================================
 # Map Command/Update Names to Functions ||
@@ -520,7 +525,6 @@ updates = {
     LINKCHANGE : linkchange,
     COSTSUPDATE: update_costs,
 }
-
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ [ NEW FUNCTION BEGINS HERE ]]
 
@@ -617,6 +621,7 @@ if __name__ == '__main__':
     # initialize dict of nodes to all neighbors |
     # -------------------------------------------
     nodes = defaultdict(lambda: default_node())
+    counter = defaultdict(lambda: int())
     for neighbor, cost in zip(run_args.neighbors, run_args.costs):
         nodes[neighbor] = create_node(cost=cost,
                                       direct=cost,
