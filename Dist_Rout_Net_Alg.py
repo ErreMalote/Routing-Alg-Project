@@ -339,10 +339,10 @@ def showrt():
     print "Distance vector list is:"
     for addr, node in nodes.iteritems():
         if addr != me:
-            print ("Destination = {destination}, "
+            print ("Destination = {destination:>19}, "
                    "Cost = {cost:>4}, "
-                   "NextHop = ({nexthop}), "
-                   "Interface = {interface}").format(
+                   "NextHop = {nexthop:>19}, "
+                   "Interface = {interface:<7}").format(
                         destination = addr,
                         cost        = node['cost'],
                         nexthop     = node['route'],
@@ -517,34 +517,34 @@ def parse_user_input(user_input):
     return parsed
 
 
-def print_nodes():
-    print 'Testing Connections...'
-    # ret = urllib2.urlopen('https://enabledns.com/ip')
-
-    interfaces = netifaces.interfaces()
-    for i in interfaces:
-        # SKIP LOOPBACK ADDRESS
-        # if i == 'lo':
-        #     continue
-        iface = netifaces.ifaddresses(i).get(netifaces.AF_INET)
-        if iface != None:
-            for j in iface:
-                print i, " \t|", j['addr']
-        else:
-            print i, " \t| offline",
-
-    # print 'public\t|', ret.read()
-
-    for node in nodes.iteritems():
-        print node[1]['counter']
-
-    # """ helper function for debugging """
-    # print "nodes: "
-    # for addr, node in nodes.iteritems():
-    #     print addr
-    #     for k,v in node.iteritems():
-    #         print '---- ', k, '\t\t', v
-    print # extra line
+# def debug():
+#     print 'Testing Connections...'
+#     # ret = urllib2.urlopen('https://enabledns.com/ip')
+#
+#     interfaces = netifaces.interfaces()
+#     for i in interfaces:
+#         # SKIP LOOPBACK ADDRESS
+#         # if i == 'lo':
+#         #     continue
+#         iface = netifaces.ifaddresses(i).get(netifaces.AF_INET)
+#         if iface != None:
+#             for j in iface:
+#                 print i, " \t|", j['addr']
+#         else:
+#             print i, " \t| offline",
+#
+#     # print 'public\t|', ret.read()
+#
+#     for node in nodes.iteritems():
+#         print node[1]['counter']
+#
+#     # """ helper function for debugging """
+#     # print "nodes: "
+#     # for addr, node in nodes.iteritems():
+#     #     print addr
+#     #     for k,v in node.iteritems():
+#     #         print '---- ', k, '\t\t', v
+#     print # extra line
 
 #=========================================
 # Map Command/Update Names to Functions ||
@@ -556,7 +556,7 @@ user_cmds = {
     SHOWRT     : showrt,
     CLOSE      : close,
     SHOWNEIGHBORS : show_neighbors,
-    DEBUG      : print_nodes,
+    # DEBUG      : print_nodes,
 }
 updates = {
     LINKDOWN   : linkdown,
