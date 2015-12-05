@@ -18,6 +18,7 @@
 # Not a default library
 # TODO Find alternative module
 import sys, socket, json, time, netifaces
+import urllib2
 from select import select
 from collections import defaultdict, namedtuple
 from threading import Thread, Timer
@@ -92,16 +93,21 @@ def estimate_costs():
     for destination_addr, destination in nodes.iteritems():
         if destination_addr != me:
             cost = float("inf")
-            nexthop = ''
+            nexthop = '999.999.999.999'
             for neighbor_addr, neighbor in get_neighbors().iteritems():
                 if destination_addr in neighbor['costs']:
                     dist = neighbor['direct'] + neighbor['costs'][destination_addr]
-                    if dist < cost:
+                    if dist <= cost:
                         cost = dist
-                        nexthop = neighbor_addr
+                        nexthop = min(nexthop, neighbor_addr)
+                        # Take route of lowest Node ID
             # set new estimated cost to node in the network
             destination['cost'] = cost
-            destination['route'] = nexthop
+            if nexthop == '999.999.999.999':
+                destination['route'] = ''
+            else:
+                destination['route'] = nexthop
+
 
 
 def update_costs(host, port, **kwargs):
@@ -157,6 +163,7 @@ def linkdown(host, port, **kwargs):
         return
     node['saved'] = node['direct']
     node['direct'] = float("inf")
+    node['counter'] += 1
     node['is_neighbor'] = False
     node['silence_monitor'].cancel()
     estimate_costs()	# Run bellman-ford
@@ -164,15 +171,19 @@ def linkdown(host, port, **kwargs):
 
 def broadcast_costs():
     """ send estimated path costs to each neighbor """
+    for node in nodes.iteritems():
+        if node[1]['counter'] >= 1:
+            node[1]['counter'] += 1
     costs = { addr: node['cost'] for addr, node in nodes.iteritems() }
     data = { 'type': COSTSUPDATE }
     for neighbor_addr, neighbor in get_neighbors().iteritems():
         poisoned_costs = deepcopy(costs)
         for dest_addr, cost in costs.iteritems():    	        # only do poisoned reverse...
-							        # if destination not me or neighbor
+							                                    # if destination not me or neighbor
             if dest_addr not in [me, neighbor_addr]:            # If we route through neighbor to get to destination ...
                 if nodes[dest_addr]['route'] == neighbor_addr:  # ... tell neighbor distance to destination is infinty!
                     poisoned_costs[dest_addr] = float("inf")
+
 
         # -------------------------------------------------
         # Send (potentially 'poisoned') costs to neighbor |
@@ -181,6 +192,15 @@ def broadcast_costs():
         data['payload']['neighbor'] = { 'direct': neighbor['direct'] }
         sock.sendto(json.dumps(data), key2addr(neighbor_addr))
 
+
+
+def garbage_collect():
+    global nodes
+    nodes_copy = nodes.copy()
+    for node in nodes.iteritems():
+        if node[1]['counter'] > 4:
+            del nodes_copy[node[0]]
+    nodes = nodes_copy.copy()
 
 def setup_server(host, port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -211,6 +231,7 @@ def create_node(cost, is_neighbor, direct=None, costs=None, addr=None):
     node['is_neighbor'] = is_neighbor
     node['direct'] = direct if direct != None else float("inf")
     node['costs']  = costs  if costs  != None else defaultdict(lambda: float("inf"))
+    node['counter'] = 0
 
     if is_neighbor:
         node['route'] = addr
@@ -319,11 +340,13 @@ def showrt():
     for addr, node in nodes.iteritems():
         if addr != me:
             print ("Destination = {destination}, "
-                   "Cost = {cost}, "
-                   "Link = ({nexthop})").format(
+                   "Cost = {cost:>4}, "
+                   "NextHop = ({nexthop}), "
+                   "Interface = {interface}").format(
                         destination = addr,
                         cost        = node['cost'],
-                        nexthop     = node['route'])
+                        nexthop     = node['route'],
+                        interface   = get_interface(me.split(':')[0]))
     print # extra line
 
 
@@ -359,6 +382,15 @@ def addr2key(host, port):
 def get_host(host):
     """ translate host into ip address """
     return localhost if host == 'localhost' else host
+
+def get_interface(host):
+    interfaces = netifaces.interfaces()
+    for i in interfaces:
+        iface = netifaces.ifaddresses(i).get(netifaces.AF_INET)
+        if iface != None:
+            for j in iface:
+                if host == j['addr']:
+                    return i
 
 def get_neighbors():
     """ return dict of all neighbors (does not include self) """
@@ -486,14 +518,26 @@ def parse_user_input(user_input):
 
 
 def print_nodes():
+    print 'Testing Connections...'
+    # ret = urllib2.urlopen('https://enabledns.com/ip')
+
     interfaces = netifaces.interfaces()
     for i in interfaces:
+        # SKIP LOOPBACK ADDRESS
         # if i == 'lo':
         #     continue
         iface = netifaces.ifaddresses(i).get(netifaces.AF_INET)
         if iface != None:
             for j in iface:
-                print i, " \t| ", j['addr']
+                print i, " \t|", j['addr']
+        else:
+            print i, " \t| offline",
+
+    # print 'public\t|', ret.read()
+
+    for node in nodes.iteritems():
+        print node[1]['counter']
+
     # """ helper function for debugging """
     # print "nodes: "
     # for addr, node in nodes.iteritems():
@@ -603,7 +647,8 @@ def _listenUpdateHandler(inputs):
 
 #======================================================================|| Main Program ||
 if __name__ == '__main__':
-    localhost = socket.gethostbyname(socket.gethostname())
+    # localhost = socket.gethostbyname(socket.gethostname())
+    localhost = netifaces.ifaddresses('wlan0')[netifaces.AF_INET][0]['addr']
     parsed = parse_argv()
 
     if 'error' in parsed:
@@ -617,6 +662,8 @@ if __name__ == '__main__':
     # initialize dict of nodes to all neighbors |
     # -------------------------------------------
     nodes = defaultdict(lambda: default_node())
+    # counter = defaultdict(lambda: int(0))
+
     for neighbor, cost in zip(run_args.neighbors, run_args.costs):
         nodes[neighbor] = create_node(cost=cost,
                                       direct=cost,
@@ -635,6 +682,8 @@ if __name__ == '__main__':
     # ---------------------------------------
     broadcast_costs()
     RepeatTimer(run_args.timeout, broadcast_costs).start()
+    RepeatTimer(run_args.timeout*4, garbage_collect).start()
+
 
 
     # ----------------------------------------------------
